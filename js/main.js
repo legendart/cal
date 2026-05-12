@@ -1,35 +1,24 @@
-// JAVIS 달력 — main.js
-// 음력(Intl), 공휴일, 메모(localStorage), D-Day(localStorage)
+/* ── JAVIS 달력 — main.js ─────────────────────────────────────────
+   ES Module · No external dependencies
+   Features: Lunar dates · Korean holidays · Memo (localStorage) · D-Day
+──────────────────────────────────────────────────────────────────── */
 
-// ── Storage keys ─────────────────────────────────────────────
-const MEMO_KEY  = 'javis_cal_memos';   // { "2026-05-13": "text" }
-const DDAY_KEY  = 'javis_cal_ddays';   // [{id, title, date, color}]
-
-function loadMemos()  { try { return JSON.parse(localStorage.getItem(MEMO_KEY) || '{}'); } catch { return {}; } }
-function saveMemos(m) { localStorage.setItem(MEMO_KEY, JSON.stringify(m)); }
-function loadDdays()  { try { return JSON.parse(localStorage.getItem(DDAY_KEY) || '[]'); } catch { return []; } }
-function saveDdays(d) { localStorage.setItem(DDAY_KEY, JSON.stringify(d)); }
-
-// ── Lunar calendar (browser Intl, no lib) ───────────────────
-const lunarFmt = new Intl.DateTimeFormat('ko-KR-u-ca-chinese', { month: 'numeric', day: 'numeric' });
-
+/* ── Lunar date via Intl ────────────────────────────────────────── */
 function getLunar(date) {
   try {
-    const parts = lunarFmt.formatToParts(date);
-    const m = parseInt(parts.find(p => p.type === 'month')?.value ?? '0');
-    const d = parseInt(parts.find(p => p.type === 'day')?.value ?? '0');
-    return { month: m, day: d };
-  } catch { return { month: 0, day: 0 }; }
+    const parts = new Intl.DateTimeFormat('ko-KR-u-ca-chinese', {
+      month: 'numeric', day: 'numeric'
+    }).formatToParts(date);
+    const month = parseInt(parts.find(p => p.type === 'month')?.value ?? '0');
+    const day   = parseInt(parts.find(p => p.type === 'day')?.value   ?? '0');
+    return { month, day };
+  } catch {
+    return { month: 0, day: 0 };
+  }
 }
 
-function lunarStr(date) {
-  const { month, day } = getLunar(date);
-  if (!month) return '';
-  return day === 1 ? `음 ${month}월` : `음 ${day}`;
-}
-
-// ── Solar holidays ────────────────────────────────────────────
-const SOLAR_HOL = {
+/* ── Solar fixed holidays ───────────────────────────────────────── */
+const SOLAR_HOLIDAYS = {
   '1-1':   '신정',
   '3-1':   '삼일절',
   '5-5':   '어린이날',
@@ -40,292 +29,362 @@ const SOLAR_HOL = {
   '12-25': '크리스마스',
 };
 
-// ── Lunar holidays (computed per year) ───────────────────────
-const lunarHolCache = {};
+/* ── Lunar holidays (built per year) ───────────────────────────── */
+const _lunarHolidayCache = {};
 
-function buildLunarHols(year) {
-  if (lunarHolCache[year]) return lunarHolCache[year];
+function buildLunarHolidays(year) {
+  if (_lunarHolidayCache[year]) return _lunarHolidayCache[year];
   const result = {};
   const end = new Date(year + 1, 0, 1);
   for (let d = new Date(year, 0, 1); d < end; d.setDate(d.getDate() + 1)) {
     const { month, day } = getLunar(d);
     const key = `${d.getMonth() + 1}-${d.getDate()}`;
-    // 설날: 음 1/1 + 전날(섣달그믐) + 다음날
-    if (month === 1 && day === 1) {
-      result[key] = '설날';
-      const prev = new Date(d); prev.setDate(prev.getDate() - 1);
-      const next = new Date(d); next.setDate(next.getDate() + 1);
-      result[`${prev.getMonth()+1}-${prev.getDate()}`] = '설날 연휴';
-      result[`${next.getMonth()+1}-${next.getDate()}`] = '설날 연휴';
+
+    // 설날: lunar 1/1 and ±1 day
+    if (month === 1 && day === 1)  result[key] = '설날';
+    if (month === 1 && day === 2)  result[key] = '설날 연휴';
+    // day 0 of lunar 1/1 is the previous solar day
+    if (month === 12 && day === 30) result[key] = '설날 전날';
+    if (month === 1  && day === 29) {
+      // edge: some years have no day 30 in 12월
+      const tomorrow = new Date(d); tomorrow.setDate(tomorrow.getDate() + 1);
+      const { month: nm, day: nd } = getLunar(tomorrow);
+      if (nm === 1 && nd === 1) result[key] = '설날 전날';
     }
-    // 추석: 음 8/15 + 전날 + 다음날
-    if (month === 8 && day === 15) {
-      result[key] = '추석';
-      const prev = new Date(d); prev.setDate(prev.getDate() - 1);
-      const next = new Date(d); next.setDate(next.getDate() + 1);
-      result[`${prev.getMonth()+1}-${prev.getDate()}`] = '추석 연휴';
-      result[`${next.getMonth()+1}-${next.getDate()}`] = '추석 연휴';
-    }
-    // 부처님오신날: 음 4/8
-    if (month === 4 && day === 8) result[key] = '부처님오신날';
+
+    // 추석: lunar 8/15 and ±1 day
+    if (month === 8 && day === 14) result[key] = '추석 전날';
+    if (month === 8 && day === 15) result[key] = '추석';
+    if (month === 8 && day === 16) result[key] = '추석 연휴';
+
+    // 부처님오신날: lunar 4/8
+    if (month === 4 && day === 8)  result[key] = '부처님오신날';
   }
-  lunarHolCache[year] = result;
+  _lunarHolidayCache[year] = result;
   return result;
 }
 
-// ── State ─────────────────────────────────────────────────────
+/* ── Get all holidays for a given date key "M-D" ───────────────── */
+function getHoliday(year, month1, day) {
+  const key = `${month1}-${day}`;
+  return SOLAR_HOLIDAYS[key] || buildLunarHolidays(year)[key] || null;
+}
+
+/* ── LocalStorage helpers ───────────────────────────────────────── */
+const MEMO_KEY  = 'javis_cal_memos';
+const DDAY_KEY  = 'javis_cal_ddays';
+
+function loadMemos() {
+  try { return JSON.parse(localStorage.getItem(MEMO_KEY) || '{}'); } catch { return {}; }
+}
+function saveMemos(obj) {
+  try { localStorage.setItem(MEMO_KEY, JSON.stringify(obj)); } catch {}
+}
+function loadDdays() {
+  try { return JSON.parse(localStorage.getItem(DDAY_KEY) || '[]'); } catch { return []; }
+}
+function saveDdays(arr) {
+  try { localStorage.setItem(DDAY_KEY, JSON.stringify(arr)); } catch {}
+}
+function dateKey(y, m, d) {
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+/* ── State ──────────────────────────────────────────────────────── */
 const today = new Date();
 let viewYear  = today.getFullYear();
-let viewMonth = today.getMonth(); // 0-based
+let viewMonth = today.getMonth(); // 0-indexed
 
-// ── DOM refs ──────────────────────────────────────────────────
-const calTitle   = document.getElementById('calTitle');
-const calGrid    = document.getElementById('calGrid');
-const ddayList   = document.getElementById('ddayList');
-const memoModal  = document.getElementById('memoModal');
-const memoDateEl = document.getElementById('memoDate');
-const memoLunar  = document.getElementById('memoLunar');
-const memoText   = document.getElementById('memoText');
-const ddayModal  = document.getElementById('ddayModal');
-const ddayModalTitle = document.getElementById('ddayModalTitle');
-const ddayTitleInput = document.getElementById('ddayTitleInput');
-const ddayDateInput  = document.getElementById('ddayDateInput');
-const ddayColorInput = document.getElementById('ddayColor');
-const ddayDeleteBtn  = document.getElementById('ddayDeleteItem');
-
-// ── Helpers ───────────────────────────────────────────────────
-function dateKey(y, m, d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
-function todayKey() { return dateKey(today.getFullYear(), today.getMonth(), today.getDate()); }
-
-function getHoliday(y, m1, d) {
-  // m1 = 1-based month
-  const solarKey = `${m1}-${d}`;
-  if (SOLAR_HOL[solarKey]) return SOLAR_HOL[solarKey];
-  const lunarHols = buildLunarHols(y);
-  return lunarHols[solarKey] ?? null;
-}
-
-// ── Calendar render ───────────────────────────────────────────
+/* ── Calendar render ────────────────────────────────────────────── */
 function renderCalendar() {
+  const grid  = document.getElementById('calGrid');
+  const title = document.getElementById('calTitle');
+  if (!grid || !title) return;
+
   const memos = loadMemos();
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const daysInPrev  = new Date(viewYear, viewMonth, 0).getDate();
+  const y = viewYear, m = viewMonth;
 
-  calTitle.textContent = `${viewYear}년 ${viewMonth + 1}월`;
-  calGrid.innerHTML = '';
+  // Title: "2026년 5월"
+  title.textContent = `${y}년 ${m + 1}월`;
 
-  // Total cells: 6 rows × 7 cols = 42
-  for (let i = 0; i < 42; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'cal-cell';
+  // Build grid HTML
+  const DOW_LABELS = ['일','월','화','수','목','금','토'];
+  let html = '';
 
-    let cellDate, isOther = false;
-    if (i < firstDay) {
-      // Previous month
-      const d = daysInPrev - firstDay + 1 + i;
-      const m = viewMonth === 0 ? 11 : viewMonth - 1;
-      const y = viewMonth === 0 ? viewYear - 1 : viewYear;
-      cellDate = new Date(y, m, d);
-      isOther = true;
-      cell.classList.add('other-month');
-    } else if (i - firstDay < daysInMonth) {
-      cellDate = new Date(viewYear, viewMonth, i - firstDay + 1);
-    } else {
-      // Next month
-      const d = i - firstDay - daysInMonth + 1;
-      const m = viewMonth === 11 ? 0 : viewMonth + 1;
-      const y = viewMonth === 11 ? viewYear + 1 : viewYear;
-      cellDate = new Date(y, m, d);
-      isOther = true;
-      cell.classList.add('other-month');
-    }
+  // Header row
+  DOW_LABELS.forEach((lbl, i) => {
+    const cls = i === 0 ? 'sun' : i === 6 ? 'sat' : '';
+    html += `<div class="cal-dow ${cls}">${lbl}</div>`;
+  });
 
-    const dow = cellDate.getDay();
-    if (dow === 0) cell.classList.add('sun-col');
-    if (dow === 6) cell.classList.add('sat-col');
+  // First day of month and total days
+  const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const daysInPrev  = new Date(y, m, 0).getDate();
 
-    const cy = cellDate.getFullYear();
-    const cm = cellDate.getMonth(); // 0-based
-    const cd = cellDate.getDate();
-    const key = dateKey(cy, cm, cd);
-
-    if (key === todayKey()) cell.classList.add('today');
-
-    // Holiday
-    const hol = getHoliday(cy, cm + 1, cd);
-    if (hol) cell.classList.add('holiday');
-
-    // Solar date
-    const solar = document.createElement('div');
-    solar.className = 'cell-solar';
-    solar.textContent = cd;
-    cell.appendChild(solar);
-
-    // Lunar
-    const lunar = document.createElement('div');
-    lunar.className = 'cell-lunar';
-    lunar.textContent = lunarStr(cellDate);
-    cell.appendChild(lunar);
-
-    // Holiday name
-    if (hol) {
-      const holEl = document.createElement('div');
-      holEl.className = 'cell-holiday-name';
-      holEl.textContent = hol;
-      cell.appendChild(holEl);
-    }
-
-    // Memo dot
-    if (memos[key]) {
-      const dot = document.createElement('div');
-      dot.className = 'memo-dot';
-      cell.appendChild(dot);
-    }
-
-    cell.addEventListener('click', () => openMemoModal(cellDate, key));
-    calGrid.appendChild(cell);
+  // Pre-fill from previous month
+  for (let i = 0; i < firstDay; i++) {
+    const d = daysInPrev - firstDay + 1 + i;
+    html += buildCell(y, m, d, true);
   }
-}
 
-// ── Memo modal ────────────────────────────────────────────────
-let activeMemoKey = null;
-
-function openMemoModal(date, key) {
-  activeMemoKey = key;
-  const memos = loadMemos();
-  const y = date.getFullYear(), m = date.getMonth(), d = date.getDate();
-  memoDateEl.textContent = `${y}년 ${m+1}월 ${d}일 (${['일','월','화','수','목','금','토'][date.getDay()]})`;
-  const lun = getLunar(date);
-  memoLunar.textContent = lun.month ? `음력 ${lun.month}월 ${lun.day}일` : '';
-  memoText.value = memos[key] ?? '';
-  memoModal.hidden = false;
-  memoText.focus();
-}
-
-document.getElementById('memoSave').addEventListener('click', () => {
-  if (!activeMemoKey) return;
-  const memos = loadMemos();
-  const txt = memoText.value.trim();
-  if (txt) memos[activeMemoKey] = txt;
-  else delete memos[activeMemoKey];
-  saveMemos(memos);
-  memoModal.hidden = true;
-  renderCalendar();
-});
-
-document.getElementById('memoDelete').addEventListener('click', () => {
-  if (!activeMemoKey) return;
-  const memos = loadMemos();
-  delete memos[activeMemoKey];
-  saveMemos(memos);
-  memoModal.hidden = true;
-  renderCalendar();
-});
-
-document.getElementById('memoClose').addEventListener('click', () => { memoModal.hidden = true; });
-
-memoModal.addEventListener('click', e => { if (e.target === memoModal) memoModal.hidden = true; });
-
-// ── D-Day panel ───────────────────────────────────────────────
-function renderDdays() {
-  const ddays = loadDdays();
-  if (!ddays.length) {
-    ddayList.innerHTML = '<div class="dday-empty">D-Day를 추가해 보세요!</div>';
-    return;
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    html += buildCell(y, m + 1, d, false, memos);
   }
-  ddayList.innerHTML = '';
-  ddays.forEach(dd => {
-    const target = new Date(dd.date + 'T00:00:00');
-    const diff = Math.round((target - new Date(todayKey() + 'T00:00:00')) / 86400000);
-    let countStr, countClass = '';
-    if (diff > 0) { countStr = `D-${diff}`; }
-    else if (diff === 0) { countStr = 'D-Day!'; countClass = 'today-mark'; }
-    else { countStr = `+${Math.abs(diff)}일 지남`; countClass = 'past'; }
 
-    const card = document.createElement('div');
-    card.className = 'dday-card';
-    card.style.borderLeftColor = dd.color ?? '#7c3aed';
-    card.innerHTML = `
-      <div class="dday-card-title">${dd.title}</div>
-      <div class="dday-card-date">${dd.date.replace(/-/g,'.')}</div>
-      <div class="dday-card-count ${countClass}">${countStr}</div>
-    `;
-    card.addEventListener('click', () => openDdayModal(dd));
-    ddayList.appendChild(card);
+  // Post-fill to complete 6 rows (42 cells)
+  const filled = firstDay + daysInMonth;
+  const remaining = 42 - filled;
+  for (let d = 1; d <= remaining; d++) {
+    html += buildCell(y, m + 2, d, true);
+  }
+
+  grid.innerHTML = html;
+
+  // Add click listeners
+  grid.querySelectorAll('.cal-cell:not(.other-month)').forEach(cell => {
+    cell.addEventListener('click', () => openMemoModal(
+      parseInt(cell.dataset.y),
+      parseInt(cell.dataset.m),
+      parseInt(cell.dataset.d)
+    ));
   });
 }
 
-// ── D-Day modal ───────────────────────────────────────────────
-let activeDdayId = null;
+function buildCell(y, m1raw, d, otherMonth, memos = {}) {
+  // Resolve actual year/month for overflow
+  let actualDate = new Date(y, m1raw - 1, d);
+  const ay = actualDate.getFullYear();
+  const am = actualDate.getMonth() + 1;
+  const ad = actualDate.getDate();
 
-function openDdayModal(dd = null) {
-  if (dd) {
-    activeDdayId = dd.id;
-    ddayModalTitle.textContent = 'D-Day 수정';
-    ddayTitleInput.value = dd.title;
-    ddayDateInput.value  = dd.date;
-    ddayColorInput.value = dd.color ?? '#7c3aed';
-    ddayDeleteBtn.hidden = false;
-  } else {
-    activeDdayId = null;
-    ddayModalTitle.textContent = 'D-Day 추가';
-    ddayTitleInput.value = '';
-    ddayDateInput.value  = todayKey();
-    ddayColorInput.value = '#7c3aed';
-    ddayDeleteBtn.hidden = true;
-  }
-  ddayModal.hidden = false;
-  ddayTitleInput.focus();
+  const isToday = (ay === today.getFullYear() && am === today.getMonth() + 1 && ad === today.getDate());
+  const key = dateKey(ay, am, ad);
+  const hasMemo = !!memos[key];
+  const holiday = otherMonth ? null : getHoliday(ay, am, ad);
+
+  // Column index: (firstDay + d-1) % 7 — but easier to compute weekday
+  const dow = actualDate.getDay(); // 0=Sun, 6=Sat
+  const isSun = dow === 0;
+  const isSat = dow === 6;
+
+  const { month: lm, day: ld } = otherMonth ? { month: 0, day: 0 } : getLunar(actualDate);
+  const lunarStr = lm && ld ? `${lm}/${ld}` : '';
+
+  const classes = [
+    'cal-cell',
+    otherMonth ? 'other-month' : '',
+    isToday    ? 'today'       : '',
+    holiday    ? 'holiday'     : '',
+    isSun      ? 'col-sun'     : '',
+    isSat      ? 'col-sat'     : '',
+  ].filter(Boolean).join(' ');
+
+  return `<div class="${classes}" data-y="${ay}" data-m="${am}" data-d="${ad}">
+    <span class="cell-solar">${ad}</span>
+    ${lunarStr ? `<span class="cell-lunar">${lunarStr}</span>` : ''}
+    ${holiday  ? `<span class="cell-holiday-name">${holiday}</span>` : ''}
+    ${hasMemo  ? '<span class="cell-memo-dot"></span>' : ''}
+  </div>`;
 }
 
-document.getElementById('addDday').addEventListener('click', () => openDdayModal());
+/* ── Memo modal ─────────────────────────────────────────────────── */
+let _memoTarget = null; // { y, m, d, key }
 
-document.getElementById('ddaySave').addEventListener('click', () => {
-  const title = ddayTitleInput.value.trim();
-  const date  = ddayDateInput.value;
-  const color = ddayColorInput.value;
-  if (!title || !date) return;
+function openMemoModal(y, m, d) {
+  _memoTarget = { y, m, d, key: dateKey(y, m, d) };
+  const memos = loadMemos();
+  document.getElementById('memoDate').textContent =
+    `${y}년 ${m}월 ${d}일 메모`;
+  document.getElementById('memoText').value = memos[_memoTarget.key] || '';
+  document.getElementById('memoModal').hidden = false;
+  document.getElementById('memoText').focus();
+}
+
+function closeMemoModal() {
+  document.getElementById('memoModal').hidden = true;
+  _memoTarget = null;
+}
+
+function saveMemo() {
+  if (!_memoTarget) return;
+  const text = document.getElementById('memoText').value.trim();
+  const memos = loadMemos();
+  if (text) memos[_memoTarget.key] = text;
+  else delete memos[_memoTarget.key];
+  saveMemos(memos);
+  closeMemoModal();
+  renderCalendar();
+}
+
+function deleteMemo() {
+  if (!_memoTarget) return;
+  const memos = loadMemos();
+  delete memos[_memoTarget.key];
+  saveMemos(memos);
+  closeMemoModal();
+  renderCalendar();
+}
+
+/* ── D-Day render ───────────────────────────────────────────────── */
+function renderDdays() {
+  const container = document.getElementById('ddayList');
+  if (!container) return;
   const ddays = loadDdays();
-  if (activeDdayId) {
-    const idx = ddays.findIndex(d => d.id === activeDdayId);
-    if (idx !== -1) ddays[idx] = { id: activeDdayId, title, date, color };
+
+  if (ddays.length === 0) {
+    container.innerHTML = '<div class="dday-empty">D-Day 이벤트가 없습니다.<br>＋ 버튼으로 추가하세요.</div>';
+    return;
+  }
+
+  // Sort by absolute distance from today
+  const todayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+  const sorted = [...ddays].sort((a, b) => {
+    const da = Math.abs(new Date(a.date).getTime() - todayMs);
+    const db = Math.abs(new Date(b.date).getTime() - todayMs);
+    return da - db;
+  });
+
+  container.innerHTML = sorted.map(item => {
+    const target = new Date(item.date + 'T00:00:00');
+    const diff = Math.round((target.getTime() - todayMs) / 86400000);
+
+    let countStr, countClass;
+    if (diff === 0)       { countStr = 'D-Day!';   countClass = 'dday-today'; }
+    else if (diff > 0)    { countStr = `D-${diff}`; countClass = 'dday-future'; }
+    else                  { countStr = `+${Math.abs(diff)}일 지남`; countClass = 'dday-past'; }
+
+    const displayDate = item.date.replace(/-/g, '.');
+
+    return `<div class="dday-card" data-id="${item.id}"
+        style="border-left-color: ${item.color || '#7c3aed'}">
+      <div class="dday-card__title">${escHtml(item.title)}</div>
+      <div class="dday-card__date">${displayDate}</div>
+      <div class="dday-card__count ${countClass}">${countStr}</div>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('.dday-card').forEach(card => {
+    card.addEventListener('click', () => openDdayModal(card.dataset.id));
+  });
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── D-Day modal ────────────────────────────────────────────────── */
+let _ddayEditId = null;
+
+function openDdayModal(editId = null) {
+  _ddayEditId = editId;
+  const modal = document.getElementById('ddayModal');
+  const titleEl = document.getElementById('ddayModalTitle');
+  const deleteBtn = document.getElementById('ddayDeleteItem');
+
+  if (editId) {
+    const item = loadDdays().find(d => d.id === editId);
+    if (!item) return;
+    titleEl.textContent = 'D-Day 수정';
+    document.getElementById('ddayTitleInput').value = item.title;
+    document.getElementById('ddayDateInput').value  = item.date;
+    document.getElementById('ddayColor').value      = item.color || '#7c3aed';
+    deleteBtn.hidden = false;
   } else {
-    ddays.push({ id: Date.now().toString(36), title, date, color });
+    titleEl.textContent = 'D-Day 추가';
+    document.getElementById('ddayTitleInput').value = '';
+    document.getElementById('ddayDateInput').value  = '';
+    document.getElementById('ddayColor').value      = '#7c3aed';
+    deleteBtn.hidden = true;
+  }
+  modal.hidden = false;
+  document.getElementById('ddayTitleInput').focus();
+}
+
+function closeDdayModal() {
+  document.getElementById('ddayModal').hidden = true;
+  _ddayEditId = null;
+}
+
+function saveDday() {
+  const title = document.getElementById('ddayTitleInput').value.trim();
+  const date  = document.getElementById('ddayDateInput').value;
+  const color = document.getElementById('ddayColor').value;
+
+  if (!title || !date) {
+    alert('제목과 날짜를 모두 입력해주세요.');
+    return;
+  }
+
+  const ddays = loadDdays();
+  if (_ddayEditId) {
+    const idx = ddays.findIndex(d => d.id === _ddayEditId);
+    if (idx !== -1) ddays[idx] = { ...ddays[idx], title, date, color };
+  } else {
+    ddays.push({ id: crypto.randomUUID(), title, date, color });
   }
   saveDdays(ddays);
-  ddayModal.hidden = true;
+  closeDdayModal();
   renderDdays();
-});
+}
 
-document.getElementById('ddayDeleteItem').addEventListener('click', () => {
-  if (!activeDdayId) return;
-  const ddays = loadDdays().filter(d => d.id !== activeDdayId);
+function deleteDday() {
+  if (!_ddayEditId) return;
+  const ddays = loadDdays().filter(d => d.id !== _ddayEditId);
   saveDdays(ddays);
-  ddayModal.hidden = true;
+  closeDdayModal();
   renderDdays();
-});
+}
 
-document.getElementById('ddayClose').addEventListener('click', () => { ddayModal.hidden = true; });
-ddayModal.addEventListener('click', e => { if (e.target === ddayModal) ddayModal.hidden = true; });
+/* ── Event wiring ───────────────────────────────────────────────── */
+function wireEvents() {
+  // Calendar nav
+  document.getElementById('prevMonth')?.addEventListener('click', () => {
+    viewMonth--;
+    if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+    renderCalendar();
+  });
+  document.getElementById('nextMonth')?.addEventListener('click', () => {
+    viewMonth++;
+    if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    renderCalendar();
+  });
 
-// ── Nav buttons ───────────────────────────────────────────────
-document.getElementById('prevMonth').addEventListener('click', () => {
-  viewMonth--;
-  if (viewMonth < 0) { viewMonth = 11; viewYear--; }
-  renderCalendar();
-});
-document.getElementById('nextMonth').addEventListener('click', () => {
-  viewMonth++;
-  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
-  renderCalendar();
-});
-document.getElementById('todayBtn').addEventListener('click', () => {
-  viewYear  = today.getFullYear();
-  viewMonth = today.getMonth();
-  renderCalendar();
-});
+  // Memo modal
+  document.getElementById('memoSave')?.addEventListener('click', saveMemo);
+  document.getElementById('memoDelete')?.addEventListener('click', deleteMemo);
+  document.getElementById('memoClose')?.addEventListener('click', closeMemoModal);
+  document.getElementById('memoModal')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeMemoModal();
+  });
 
-// ── Init ──────────────────────────────────────────────────────
+  // D-Day modal
+  document.getElementById('addDday')?.addEventListener('click', () => openDdayModal());
+  document.getElementById('ddaySave')?.addEventListener('click', saveDday);
+  document.getElementById('ddayDeleteItem')?.addEventListener('click', deleteDday);
+  document.getElementById('ddayClose')?.addEventListener('click', closeDdayModal);
+  document.getElementById('ddayModal')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeDdayModal();
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeMemoModal();
+      closeDdayModal();
+    }
+    if (e.key === 'ArrowLeft'  && !e.target.matches('input,textarea')) {
+      document.getElementById('prevMonth')?.click();
+    }
+    if (e.key === 'ArrowRight' && !e.target.matches('input,textarea')) {
+      document.getElementById('nextMonth')?.click();
+    }
+  });
+}
+
+/* ── Init ───────────────────────────────────────────────────────── */
+wireEvents();
 renderCalendar();
 renderDdays();

@@ -297,3 +297,144 @@ footer {
   .cal-cell { min-height: 48px; }
   .cell-lunar, .cell-holiday-name { display: none; }
 }
+
+/* ── Modals ──────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 1rem;
+}
+.modal-overlay[hidden] { display: none; }
+
+.modal {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.modal h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary-l);
+}
+.modal textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 110px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.modal textarea:focus { border-color: var(--primary); }
+.modal input[type="text"],
+.modal input[type="date"] {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+.modal input[type="text"]:focus,
+.modal input[type="date"]:focus { border-color: var(--primary); }
+.modal input[type="date"] { color-scheme: dark; }
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.color-row input[type="color"] {
+  width: 40px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.modal-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.15s, opacity 0.15s;
+}
+#memoSave,  #ddaySave   { background: var(--primary); color: #fff; }
+#memoSave:hover, #ddaySave:hover { background: var(--primary-l); }
+#memoDelete, #ddayDeleteItem {
+  background: rgba(239,68,68,0.15);
+  color: var(--red);
+  border: 1px solid rgba(239,68,68,0.25);
+}
+#memoDelete:hover, #ddayDeleteItem:hover { background: rgba(239,68,68,0.3); }
+#memoClose, #ddayClose {
+  background: var(--surface2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+#memoClose:hover, #ddayClose:hover { color: var(--text); }
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+footer {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .cal-layout {
+    flex-direction: column;
+    margin: 0.75rem auto;
+  }
+  .dday-panel {
+    width: 100%;
+    position: static;
+  }
+  .cal-cell {
+    min-height: 60px;
+    padding: 0.3rem;
+  }
+  .cell-solar { font-size: 0.85rem; }
+  .cell-lunar { display: none; }
+  .cell-holiday-name { display: none; }
+}
+@media (max-width: 400px) {
+  .cal-cell { min-height: 46px; }
+  .cell-solar { font-size: 0.75rem; }
+}
