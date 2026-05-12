@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JAVIS 달력</title>
+  <meta name="description" content="음력·공휴일·메모·D-Day 달력">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://legendart.github.io/nav.js?v=2" defer></script>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-logo">📅</div>
+      <div>
+        <div class="brand-name">JAVIS 달력</div>
+        <div class="brand-sub">Korean Calendar</div>
+      </div>
+    </div>
+    <div class="header-spacer"></div>
+    <button class="today-btn" id="todayBtn">오늘</button>
+  </div>
+</header>
+
+<main class="cal-layout">
+  <section class="cal-section">
+    <div class="cal-nav">
+      <button class="nav-btn" id="prevMonth">&#9664;</button>
+      <h2 id="calTitle"></h2>
+      <button class="nav-btn" id="nextMonth">&#9654;</button>
+    </div>
+    <div class="dow-row">
+      <span class="dow sun">일</span>
+      <span class="dow">월</span>
+      <span class="dow">화</span>
+      <span class="dow">수</span>
+      <span class="dow">목</span>
+      <span class="dow">금</span>
+      <span class="dow sat">토</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </section>
+
+  <aside class="dday-panel">
+    <div class="dday-header">
+      <span class="dday-title">📌 D-Day</span>
+      <button class="add-btn" id="addDday">＋ 추가</button>
+    </div>
+    <div id="ddayList" class="dday-list"></div>
+  </aside>
+</main>
+
+<footer>JAVIS 달력 &mdash; 음력 &amp; 공휴일</footer>
+
+<!-- Memo modal -->
+<div class="modal-overlay" id="memoModal" hidden>
+  <div class="modal">
+    <h3 class="modal-date" id="memoDate"></h3>
+    <div class="modal-lunar" id="memoLunar"></div>
+    <textarea id="memoText" placeholder="메모를 입력하세요..."></textarea>
+    <div class="modal-actions">
+      <button class="btn-primary" id="memoSave">저장</button>
+      <button class="btn-danger" id="memoDelete">삭제</button>
+      <button class="btn-ghost" id="memoClose">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- D-Day modal -->
+<div class="modal-overlay" id="ddayModal" hidden>
+  <div class="modal">
+    <h3 class="modal-heading" id="ddayModalTitle">D-Day 추가</h3>
+    <label class="form-label">제목</label>
+    <input type="text" id="ddayTitleInput" placeholder="이벤트 제목" maxlength="30">
+    <label class="form-label">날짜</label>
+    <input type="date" id="ddayDateInput">
+    <div class="color-row">
+      <label class="form-label">색상</label>
+      <input type="color" id="ddayColor" value="#7c3aed">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="ddaySave">저장</button>
+      <button class="btn-danger" id="ddayDeleteItem" hidden>삭제</button>
+      <button class="btn-ghost" id="ddayClose">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js?v=1"></script>
+<script>document.addEventListener("DOMContentLoaded",function(){JavisNav.init("cal")});</script>
+</body>
+</html>
