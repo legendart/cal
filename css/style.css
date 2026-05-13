@@ -352,11 +352,15 @@ footer {
 }
 
 /* ── Responsive — tablet ──────────────────────────────────── */
+/* ── Responsive — tablet ──────────────────────────────────── */
 @media (max-width: 768px) {
   .cal-layout {
     flex-direction: column;
     padding: 0 0.5rem;
-    margin: 0.75rem auto;
+    margin: 0.75rem 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   .dday-panel { width: 100%; }
   .cal-cell { min-height: 64px; }
@@ -364,11 +368,23 @@ footer {
 
 /* ── Responsive — mobile ──────────────────────────────────── */
 @media (max-width: 540px) {
-  .cal-layout { padding: 0; margin: 0; }
-  .cal-section { padding: 0 4px; }
-  .dday-panel  { padding: 0 8px; }
+  body { overflow-x: hidden; }
+  .cal-layout {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .cal-section {
+    padding: 0 3px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .dday-panel  { padding: 0 8px; width: 100%; box-sizing: border-box; }
   .header { padding: 0 0.75rem; }
   .brand-sub  { display: none; }
+  .cal-grid { gap: 2px; }
   .cal-cell {
     min-height: 56px;
     padding: 3px 3px 2px;
@@ -377,6 +393,7 @@ footer {
   .cell-solar { font-size: 0.82rem; }
   .cell-lunar { font-size: 0.55rem; }
   .cell-holiday-name { font-size: 0.52rem; }
+  .ym-picker { margin: 0 3px 0.5rem; }
 }
 @media (max-width: 380px) {
   .cal-cell { min-height: 48px; }
