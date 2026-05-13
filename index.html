@@ -30,18 +30,20 @@
   <section class="cal-section">
     <div class="cal-nav">
       <button class="nav-btn" id="prevMonth">&#9664;</button>
-      <h2 id="calTitle"></h2>
+      <button class="cal-title-btn" id="calTitle" aria-label="년도/월 선택"></button>
       <button class="nav-btn" id="nextMonth">&#9654;</button>
     </div>
-    <div class="dow-row">
-      <span class="dow sun">일</span>
-      <span class="dow">월</span>
-      <span class="dow">화</span>
-      <span class="dow">수</span>
-      <span class="dow">목</span>
-      <span class="dow">금</span>
-      <span class="dow sat">토</span>
+
+    <!-- Year/Month picker (hidden by default) -->
+    <div class="ym-picker" id="ymPicker" hidden>
+      <div class="ym-year-row">
+        <button class="ym-yr-btn" id="ymPrevYear">&#9664;</button>
+        <span class="ym-year" id="ymYearLabel"></span>
+        <button class="ym-yr-btn" id="ymNextYear">&#9654;</button>
+      </div>
+      <div class="ym-months" id="ymMonths"></div>
     </div>
+
     <div class="cal-grid" id="calGrid"></div>
   </section>
 
@@ -63,9 +65,9 @@
     <div class="modal-lunar" id="memoLunar"></div>
     <textarea id="memoText" placeholder="메모를 입력하세요..."></textarea>
     <div class="modal-actions">
-      <button class="btn-primary" id="memoSave">저장</button>
-      <button class="btn-danger" id="memoDelete">삭제</button>
-      <button class="btn-ghost" id="memoClose">닫기</button>
+      <button id="memoSave">저장</button>
+      <button id="memoDelete">삭제</button>
+      <button id="memoClose">닫기</button>
     </div>
   </div>
 </div>
@@ -73,7 +75,7 @@
 <!-- D-Day modal -->
 <div class="modal-overlay" id="ddayModal" hidden>
   <div class="modal">
-    <h3 class="modal-heading" id="ddayModalTitle">D-Day 추가</h3>
+    <h3 id="ddayModalTitle">D-Day 추가</h3>
     <label class="form-label">제목</label>
     <input type="text" id="ddayTitleInput" placeholder="이벤트 제목" maxlength="30">
     <label class="form-label">날짜</label>
@@ -83,14 +85,14 @@
       <input type="color" id="ddayColor" value="#7c3aed">
     </div>
     <div class="modal-actions">
-      <button class="btn-primary" id="ddaySave">저장</button>
-      <button class="btn-danger" id="ddayDeleteItem" hidden>삭제</button>
-      <button class="btn-ghost" id="ddayClose">닫기</button>
+      <button id="ddaySave">저장</button>
+      <button id="ddayDeleteItem" hidden>삭제</button>
+      <button id="ddayClose">닫기</button>
     </div>
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=1"></script>
+<script type="module" src="js/main.js?v=2"></script>
 <script>document.addEventListener("DOMContentLoaded",function(){JavisNav.init("cal")});</script>
 </body>
 </html>
